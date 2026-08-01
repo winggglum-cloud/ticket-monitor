@@ -299,4 +299,4 @@ def run_monitor(check_interval: int = None):
         run_monitor(check_interval)
 
 if __name__ == "__main__":
-    run_monitor()
+    check_tickets()
