@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" 
-上海文化广场余票监控脚本 v2
-使用Selenium执行JavaScript，支持动态加载
 """
-
+上海文化广场余票监控脚本 v2 - 修复版
+使用Selenium执行JavaScript，支持动态加载
+修复: 时区问题（UTC→UTC+8） & 移除测试模式
+"""
 import time
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import hashlib
 import sys
@@ -22,11 +22,18 @@ except ImportError:
     print("❌ 需要安装Selenium: pip install selenium")
     exit(1)
 
+# ==================== 时区工具 ====================
+# 上海时区 (UTC+8)
+SH_TZ = timezone(timedelta(hours=8))
+
+def get_shanghai_time() -> str:
+    """获取上海时间"""
+    return datetime.now(SH_TZ).strftime('%Y-%m-%d %H:%M:%S')
+
 # ==================== 配置部分 ====================
 CONFIG = {
     "url": "https://www.shcstheatre.com/Program/ProgramDetails.aspx?headtype=YanChu&ARTICLE_ID=41885&id=41885",
     "check_interval": 60,  # 1分钟检查一次
-
     "notification": {
         "type": "email",
         "email": {
@@ -68,6 +75,7 @@ def send_email_notification(subject: str, message: str) -> bool:
         from email.mime.text import MIMEText
 
         email_config = CONFIG["notification"]["email"]
+
         msg = MIMEText(message, 'html', 'utf-8')
         msg['Subject'] = subject
         msg['From'] = email_config["sender"]
@@ -113,12 +121,9 @@ def fetch_page_with_selenium() -> Optional[str]:
 
         # 等待动态内容加载
         time.sleep(2)
-
         html = driver.page_source
         driver.quit()
-
         return html
-
     except Exception as e:
         print(f"❌ Selenium获取页面失败: {e}")
         return None
@@ -131,7 +136,6 @@ def extract_ticket_info(driver) -> Dict:
         event_items = event_list_elem.find_elements(By.CLASS_NAME, "selection-date-details")
 
         tickets = []
-
         for item in event_items:
             try:
                 # 获取日期和时间
@@ -149,14 +153,12 @@ def extract_ticket_info(driver) -> Dict:
 
                 event_info = f"{date_text} {time_text}".strip()
 
-                # 关键改动：不再过滤隐藏状态，直接获取所有场次
                 tickets.append({
                     "date_time": event_info,
                     "seat_count": seat_count,
                     "available": is_available,
                     "raw_text": f"{event_info} - {'✅有票' if is_available else '❌已售罄'} ({seat_count}张)"
                 })
-
             except Exception as e:
                 continue
 
@@ -168,7 +170,6 @@ def extract_ticket_info(driver) -> Dict:
             "count": len(tickets),
             "available_count": available_count
         }
-
     except Exception as e:
         print(f"❌ 提取信息失败: {e}")
         return {"status": "error", "data": [], "count": 0, "available_count": 0}
@@ -177,7 +178,7 @@ def extract_ticket_info(driver) -> Dict:
 def check_tickets():
     """检查余票"""
     print(f"\n{'='*60}")
-    print(f"🔍 检查时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🔍 检查时间: {get_shanghai_time()}")
     print(f"{'='*60}")
 
     try:
@@ -203,7 +204,7 @@ def check_tickets():
             if more_button:
                 print("   正在展开所有场次...")
                 driver.execute_script("arguments[0].click();", more_button)
-                time.sleep(3)  # 增加等待时间
+                time.sleep(3)
                 print("   ✅ 已展开所有场次")
         except:
             pass
@@ -213,7 +214,7 @@ def check_tickets():
         for i in range(5):
             driver.execute_script("window.scrollBy(0, 500);")
             time.sleep(0.5)
-        driver.execute_script("window.scrollTo(0, 0);")  # 滚回顶部
+        driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(2)
 
         # 提取信息
@@ -231,7 +232,7 @@ def check_tickets():
         content_hash = get_content_hash(json.dumps(ticket_info))
         state = load_state()
 
-        # 关键：只在有余票时才通知
+        # 只在有余票时才通知
         if ticket_info['available_count'] > 0:
             print(f"\n✨ 发现 {ticket_info['available_count']} 场有余票！")
 
@@ -242,14 +243,12 @@ def check_tickets():
 
             message = f"""
             <h2>🎭 大状王音乐剧 - 有新余票！</h2>
-            <p><strong>发现时间:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p><strong>发现时间:</strong> {get_shanghai_time()}</p>
             <p><strong>可购票场次:</strong></p>
             <pre>{ticket_details}</pre>
             <p><strong>立即购票:</strong> <a href="{CONFIG['url']}">点击这里</a></p>
             """
-
             send_notification("🎭 大状王音乐剧 - 有新余票！", message)
-
         else:
             print("⏸️ 暂无余票")
 
@@ -265,7 +264,10 @@ def check_tickets():
 
     except Exception as e:
         print(f"❌ 检查失败: {e}")
-        driver.quit()
+        try:
+            driver.quit()
+        except:
+            pass
 
 def run_monitor(check_interval: int = None):
     """运行监控"""
@@ -277,6 +279,7 @@ def run_monitor(check_interval: int = None):
 ║   🎭 上海文化广场 - 大状王音乐剧 余票监控 v2       ║
 ║   检查间隔: {check_interval} 秒 ({check_interval//60} 分钟)
 ║   通知方式: 邮件 (有票时发送)
+║   当前时间: {get_shanghai_time()}
 ╚══════════════════════════════════════════════════════╝
     """)
 
@@ -296,17 +299,4 @@ def run_monitor(check_interval: int = None):
         run_monitor(check_interval)
 
 if __name__ == "__main__":
-    # 支持命令行参数
-    if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        print("🧪 测试模式：发送测试邮件...")
-        test_message = f"""
-        <h2>🎭 大状王音乐剧 - 测试邮件</h2>
-        <p><strong>这是一条测试邮件</strong></p>
-        <p><strong>发送时间:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        <p>如果你收到这条邮件，说明邮件通知系统工作正常！</p>
-        <p><strong>查看票务:</strong> <a href="{CONFIG['url']}">点击这里</a></p>
-        """
-        send_notification("🧪 测试邮件 - 余票监控系统正常", test_message)
-        print("✅ 测试邮件已发送！")
-    else:
-        run_monitor()
+    run_monitor()
