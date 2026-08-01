@@ -1,18 +1,8 @@
 name: 大状王余票监控
-
 on:
   schedule:
     - cron: '*/1 * * * *'
   workflow_dispatch:
-    inputs:
-      test_mode:
-        description: '是否运行测试模式（发送测试邮件）'
-        required: true
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
 
 jobs:
   monitor:
@@ -32,10 +22,5 @@ jobs:
           sudo apt-get install -y chromium-browser
           pip install selenium requests beautifulsoup4 webdriver-manager
       
-      - name: 运行监控脚本（测试模式）
-        if: ${{ github.event.inputs.test_mode == 'true' }}
-        run: python ticket_monitor.py --test
-      
-      - name: 运行监控脚本（正常模式）
-        if: ${{ github.event.inputs.test_mode != 'true' }}
+      - name: 运行监控脚本
         run: python ticket_monitor.py
