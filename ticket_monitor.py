@@ -163,7 +163,7 @@ def check_tickets():
 
         # 创建WebDriver
         driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
+            service=Service('/usr/bin/chromium-browser'),
             options=options
         )
 
