@@ -162,10 +162,7 @@ def check_tickets():
         options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
 
         # 创建WebDriver
-        driver = webdriver.Chrome(
-            service=Service('/usr/bin/chromium-browser'),
-            options=options
-        )
+        driver = webdriver.Chrome(options=options)
 
         print("   📡 正在访问页面...")
         driver.get(CONFIG["url"])
@@ -189,7 +186,7 @@ def check_tickets():
             pass
 
         # 滚动页面加载更多内容
-        print("   📜 正在滚动页面���载内容...")
+        print("   📜 正在滚动页面加载内容...")
         for i in range(5):
             driver.execute_script("window.scrollBy(0, 500);")
             time.sleep(0.5)
